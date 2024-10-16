@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "koopman"
+version = "0.1.0"
+description = ""
+authors = ["Cole Hill <coleh@usf.edu>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+torch = "^2.4.1"
+torchvision = "^0.19.1"
+lightning = "^2.4.0"
+numpy = "^2.1.2"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
