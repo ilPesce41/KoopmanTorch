@@ -4,24 +4,35 @@ import torch
 
 def build_koopman_operator(num_real: int, num_complex_conjugate_pairs: int, real_lambda: Tensor, mu: Tensor, omega: Tensor) -> Tensor:
     
-    assert real_lambda.shape == (num_real,)
-    assert mu.shape == (num_complex_conjugate_pairs,)
-    assert omega.shape == (num_complex_conjugate_pairs,)
+    batch_size = real_lambda.shape[0]
+    if num_real > 0:
+        assert real_lambda.shape == (batch_size, num_real)
+    if num_complex_conjugate_pairs > 0:
+        assert mu.shape == (batch_size, num_complex_conjugate_pairs)
+        assert omega.shape == (batch_size, num_complex_conjugate_pairs)
     device = real_lambda.device if num_real > 0 else mu.device
 
     n = num_real + 2 * num_complex_conjugate_pairs
-    koopman_operator = torch.zeros(n, n)
-    for i in range(num_real):
-        koopman_operator[i, i] = real_lambda[i]
-    base = num_real
-    for i in range(num_complex_conjugate_pairs):
-        block = torch.exp(mu[i]) * torch.tensor(
-            [[torch.cos(omega[i]), -torch.sin(omega[i])], 
-             [torch.sin(omega[i]), torch.cos(omega[i])]]
-            )
-        koopman_operator[base:base+2, base:base+2] = block
-        base += 2
-    return koopman_operator.to(device)
+    koopman_operator = torch.zeros(batch_size, n, n, device=device)
+
+    if num_real > 0:
+        koopman_operator[:, :num_real, :num_real] = torch.diag_embed(real_lambda)
+
+    if num_complex_conjugate_pairs > 0:
+        base = num_real
+        mu_exp = torch.exp(mu)
+        cos_omega = torch.cos(omega)
+        sin_omega = torch.sin(omega)
+
+        indices = torch.arange(num_complex_conjugate_pairs, device=device)
+        base_indices = base + 2 * indices
+
+        koopman_operator[:, base_indices, base_indices] = mu_exp * cos_omega
+        koopman_operator[:, base_indices, base_indices + 1] = -mu_exp * sin_omega
+        koopman_operator[:, base_indices + 1, base_indices] = mu_exp * sin_omega
+        koopman_operator[:, base_indices + 1, base_indices + 1] = mu_exp * cos_omega
+
+    return koopman_operator
 
 
 class AuxillaryNetwork(Module):
@@ -86,6 +97,7 @@ class KoopmanOperator(Module):
         self.auxillary_network = auxillary_network
         self.num_real = auxillary_network.num_real
         self.num_complex_conjugate_pairs = auxillary_network.num_complex_conjugate_pairs
+        n = self.num_real + 2 * self.num_complex_conjugate_pairs
 
 
     def forward(self, z: Tensor) -> Tensor:
@@ -97,19 +109,8 @@ class KoopmanOperator(Module):
 
         real_lambda, mu, omega = self.auxillary_network(z)
         z_pred = torch.zeros_like(z)
-        for i in range(len(z_pred)):
+        koopman_mat = build_koopman_operator(self.num_real, self.num_complex_conjugate_pairs, real_lambda, mu, omega)
+        z_pred = torch.bmm(z.unsqueeze(1), koopman_mat).squeeze(1)
 
-            if self.num_real > 0 and self.num_complex_conjugate_pairs > 0:
-                l, m, o = real_lambda[i], mu[i], omega[i]
-            elif self.num_real > 0:
-                l = real_lambda[i]
-                m = torch.zeros(0).to(z.device)
-                o = torch.zeros(0).to(z.device)
-            else:
-                l = torch.zeros(0).to(z.device)
-                m, o = mu[i], omega[i]
-
-            koopman_mat = build_koopman_operator(self.num_real, self.num_complex_conjugate_pairs, l, m, o)
-            z_pred[i] = z[i] @ koopman_mat
         z_pred = z_pred.reshape(batch_size, seq_len, c)
         return z_pred
