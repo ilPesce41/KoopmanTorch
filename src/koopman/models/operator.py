@@ -4,10 +4,11 @@ import torch
 
 def build_koopman_operator(num_real: int, num_complex_conjugate_pairs: int, real_lambda: Tensor, mu: Tensor, omega: Tensor) -> Tensor:
     
-    batch_size = real_lambda.shape[0]
     if num_real > 0:
+        batch_size =  real_lambda.shape[0]
         assert real_lambda.shape == (batch_size, num_real)
     if num_complex_conjugate_pairs > 0:
+        batch_size =  mu.shape[0]
         assert mu.shape == (batch_size, num_complex_conjugate_pairs)
         assert omega.shape == (batch_size, num_complex_conjugate_pairs)
     device = real_lambda.device if num_real > 0 else mu.device
