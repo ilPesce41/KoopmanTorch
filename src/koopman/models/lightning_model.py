@@ -45,7 +45,7 @@ class KoopmanLightningModel(LightningModule):
 
     def training_step(self, batch, batch_idx):
         
-        x = batch[0]
+        x = batch[:, 0]
         z, x_hat = self.model(x)
         z_i = z
         losses = defaultdict(lambda : 0)
@@ -64,7 +64,7 @@ class KoopmanLightningModel(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x = batch[0]
+        x = batch[:, 0]
         z, x_hat = self.model(x)
         z_i = z
         losses = defaultdict(lambda : 0)
@@ -83,7 +83,7 @@ class KoopmanLightningModel(LightningModule):
         return loss
     
     def test_step(self, batch, batch_idx):
-        x = batch[0]
+        x = batch[:, 0]
         z, x_hat = self.model(x)
         z_i = z
         losses = defaultdict(lambda : 0)
