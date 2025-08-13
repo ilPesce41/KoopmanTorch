@@ -1,6 +1,7 @@
 from torch.nn import Module, Linear, ReLU, Sequential, ModuleList
 from torch import Tensor
 import torch
+import torch.nn as nn
 
 def build_koopman_operator(num_real: int, num_complex_conjugate_pairs: int, real_lambda: Tensor, mu: Tensor, omega: Tensor) -> Tensor:
     
@@ -92,13 +93,19 @@ class AuxillaryNetwork(Module):
 
 class KoopmanOperator(Module):
 
-    def __init__(self, auxillary_network: AuxillaryNetwork):
+    def __init__(self, auxillary_network: AuxillaryNetwork | None):
         super(KoopmanOperator, self).__init__()
 
         self.auxillary_network = auxillary_network
         self.num_real = auxillary_network.num_real
         self.num_complex_conjugate_pairs = auxillary_network.num_complex_conjugate_pairs
         n = self.num_real + 2 * self.num_complex_conjugate_pairs
+
+        # real_lambda, mu, and omega are learned parameters
+        if auxillary_network is None:
+            self.real_lambda = nn.Parameter(torch.zeros(1, self.num_real))
+            self.mu = nn.Parameter(torch.zeros(1, self.num_complex_conjugate_pairs))
+            self.omega = nn.Parameter(torch.zeros(1, self.num_complex_conjugate_pairs))
 
 
     def forward(self, z: Tensor) -> Tensor:
@@ -108,9 +115,15 @@ class KoopmanOperator(Module):
 
         z = z.reshape(-1, c)
 
-        real_lambda, mu, omega = self.auxillary_network(z)
         z_pred = torch.zeros_like(z)
-        koopman_mat = build_koopman_operator(self.num_real, self.num_complex_conjugate_pairs, real_lambda, mu, omega)
+        if self.auxillary_network is None:
+            real_lambda = self.real_lambda.expand(batch_size * seq_len, -1)
+            mu = self.mu.expand(batch_size * seq_len, -1)
+            omega = self.omega.expand(batch_size * seq_len, -1)
+            koopman_mat = build_koopman_operator(self.num_real, self.num_complex_conjugate_pairs, real_lambda, mu, omega)
+        else:
+            real_lambda, mu, omega = self.auxillary_network(z)
+            koopman_mat = build_koopman_operator(self.num_real, self.num_complex_conjugate_pairs, real_lambda, mu, omega)
         z_pred = torch.bmm(z.unsqueeze(1), koopman_mat).squeeze(1)
 
         z_pred = z_pred.reshape(batch_size, seq_len, c)

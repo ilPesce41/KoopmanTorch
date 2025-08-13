@@ -8,7 +8,7 @@ from koopman.losses.loss import ReconstructionLoss, LinearityLoss, PredictionLos
 from collections import defaultdict
 
 class KoopmanLightningModel(LightningModule):
-    def __init__(self, input_dim, latent_dim, num_hidden_layers, hidden_dim, num_real, num_complex_conjugate_pairs, num_pred=30, learning_rate=1e-3, pretrain=False):
+    def __init__(self, input_dim, latent_dim, num_hidden_layers, hidden_dim, num_real, num_complex_conjugate_pairs, num_pred=30, learning_rate=1e-3, pretrain=False, use_aux_net=True):
         super(KoopmanLightningModel, self).__init__()
 
         encoder = []
@@ -27,7 +27,9 @@ class KoopmanLightningModel(LightningModule):
         decoder.append(nn.Linear(hidden_dim, input_dim))
         self.decoder = nn.Sequential(*decoder)
 
-        aux_net = AuxillaryNetwork(num_real, num_complex_conjugate_pairs, num_hidden_layers, hidden_dim)
+        aux_net = None
+        if use_aux_net:
+            aux_net = AuxillaryNetwork(num_real, num_complex_conjugate_pairs, num_hidden_layers, hidden_dim)
         koopman_operator = KoopmanOperator(aux_net)
 
         self.model = BaseKoopmanAutoencoder(self.encoder, self.decoder, koopman_operator)
