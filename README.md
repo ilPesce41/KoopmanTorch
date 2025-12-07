@@ -1,4 +1,5 @@
 # Introduction
+[![DOI](https://zenodo.org/badge/893574206.svg)](https://doi.org/10.5281/zenodo.17850359)
 
 This repository contains source code for training an Autoencoder to approximate Koopman Operators for dynamical systems.
 
